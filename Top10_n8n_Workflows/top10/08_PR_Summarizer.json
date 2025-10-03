@@ -1,0 +1,154 @@
+{
+  "name": "PR Summarizer (Webhook → Fetch → LLM → Slack)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "github-pr",
+        "responseMode": "lastNode",
+        "responseData": "allEntries"
+      },
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/{{owner}}/{{repo}}/pulls/{{$json.body.pr}}",
+        "options": {
+          "useQueryString": true
+        },
+        "sendBinaryData": false,
+        "ignoreResponseCode": true,
+        "responseFormat": "json",
+        "authentication": "none",
+        "method": "GET",
+        "jsonParameters": true
+      },
+      "id": "node-http-fetch-pr",
+      "name": "Fetch PR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "gpt-4o-mini",
+        "systemMessage": "Summarize PR changes, risks, test plan.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "={{$json}}"
+          }
+        ],
+        "responseType": "json"
+      },
+      "id": "node-openai-openai---chat",
+      "name": "OpenAI - Chat",
+      "type": "n8n-nodes-langchain.openai",
+      "typeVersion": 2,
+      "position": [
+        950,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "{{ $env.SLACK_CHANNEL_ID || 'C123456' }}",
+        "text": "={{$json.summary || $json.message || 'Hello from n8n'}}"
+      },
+      "id": "node-slack-post-to-channel",
+      "name": "Post to Channel",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "responseCode": 200,
+        "responseMode": "lastNode",
+        "responseData": "firstEntryJson"
+      },
+      "id": "node-respond-respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1950,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fetch PR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch PR": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Chat": {
+      "main": [
+        [
+          {
+            "node": "Post to Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Channel": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "regular"
+  },
+  "staticData": {},
+  "version": 2,
+  "meta": {
+    "created": "2025-10-03T14:44:37.602533Z",
+    "author": "Mehdi Belbachir – SMB Pack (Generated)"
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "name": "KPI Snapshot to Email (Cron → Fetch → LLM)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": "custom",
+        "cronExpression": "0 18 * * 1-5"
+      },
+      "id": "node-schedule",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://bi.example.com/kpis/today",
+        "options": {
+          "useQueryString": true
+        },
+        "sendBinaryData": false,
+        "ignoreResponseCode": true,
+        "responseFormat": "json",
+        "authentication": "none",
+        "method": "GET",
+        "jsonParameters": true
+      },
+      "id": "node-http-fetch-kpis",
+      "name": "Fetch KPIs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "gpt-4o-mini",
+        "systemMessage": "Create concise KPI narrative with anomalies and next steps.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "={{$json}}"
+          }
+        ],
+        "responseType": "json"
+      },
+      "id": "node-openai-openai---chat",
+      "name": "OpenAI - Chat",
+      "type": "n8n-nodes-langchain.openai",
+      "typeVersion": 2,
+      "position": [
+        950,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "{{ $env.FROM_EMAIL || 'no-reply@example.com' }}",
+        "toEmail": "={{$env.TO_EMAIL || 'ops@example.com'}}",
+        "subject": "={{$json.subject || 'Automation update'}}",
+        "text": "={{$json.body || 'See details attached'}}"
+      },
+      "id": "node-email-send-email-board",
+      "name": "Email Board",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Fetch KPIs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch KPIs": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Chat": {
+      "main": [
+        [
+          {
+            "node": "Email Board",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "regular"
+  },
+  "staticData": {},
+  "version": 2,
+  "meta": {
+    "created": "2025-10-03T14:44:37.602795Z",
+    "author": "Mehdi Belbachir – SMB Pack (Generated)"
+  }
+}

@@ -1,0 +1,185 @@
+{
+  "name": "Helpdesk RAG (Webhook → Vector Search → LLM → Slack Approval)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "helpdesk-rag",
+        "responseMode": "lastNode",
+        "responseData": "allEntries"
+      },
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "render",
+        "text": "# RAG Setup\n\nIndex your KB to a vector DB (e.g., Pinecone). This template calls your Pinecone query endpoint via HTTP and sends top docs to OpenAI."
+      },
+      "id": "node-md-rag-setup",
+      "name": "Docs: RAG Setup",
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        450,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://your-pinecone-endpoint/query",
+        "options": {
+          "useQueryString": true
+        },
+        "sendBinaryData": false,
+        "ignoreResponseCode": true,
+        "responseFormat": "json",
+        "authentication": "none",
+        "method": "POST",
+        "jsonParameters": true
+      },
+      "id": "node-http-pinecone-query",
+      "name": "Pinecone Query",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "gpt-4o-mini",
+        "systemMessage": "Answer with citations from provided documents. If unsure, say you don't know.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "={{$json}}"
+          }
+        ],
+        "responseType": "json"
+      },
+      "id": "node-openai-openai---chat",
+      "name": "OpenAI - Chat",
+      "type": "n8n-nodes-langchain.openai",
+      "typeVersion": 2,
+      "position": [
+        950,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "postAndWait",
+        "channel": "{{ $env.SLACK_APPROVAL_CHANNEL_ID || 'C123456' }}",
+        "text": "={{$json.draft || 'Approve?' }}",
+        "additionalFields": {
+          "approvalText": "Approve",
+          "disapprovalText": "Reject",
+          "includeDisapprovalButton": true,
+          "timeout": 3600
+        }
+      },
+      "id": "node-slack-approve-slack---wait-for-app",
+      "name": "Slack - Wait for Approval",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "responseCode": 200,
+        "responseMode": "lastNode",
+        "responseData": "firstEntryJson"
+      },
+      "id": "node-respond-respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1950,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Docs: RAG Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Docs: RAG Setup": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Query": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Chat": {
+      "main": [
+        [
+          {
+            "node": "Slack - Wait for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Wait for Approval": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "regular"
+  },
+  "staticData": {},
+  "version": 2,
+  "meta": {
+    "created": "2025-10-03T14:44:37.601543Z",
+    "author": "Mehdi Belbachir – SMB Pack (Generated)"
+  }
+}
