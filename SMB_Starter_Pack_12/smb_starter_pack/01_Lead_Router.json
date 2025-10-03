@@ -1,0 +1,179 @@
+{
+  "name": "Lead Router (Webhook → Enrich → LLM Score → Slack)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-router",
+        "responseMode": "lastNode",
+        "responseData": "allEntries"
+      },
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "render",
+        "text": "# Lead Router Setup\n\nFill Slack/OpenAI credentials. Optional: add enrichment HTTP node."
+      },
+      "id": "node-md-lead-router-setup",
+      "name": "Docs: Lead Router Setup",
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        450,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.example.com/enrich?email={{$json.body.email}}",
+        "options": {
+          "useQueryString": true
+        },
+        "sendBinaryData": false,
+        "ignoreResponseCode": true,
+        "responseFormat": "json",
+        "authentication": "none",
+        "method": "GET",
+        "jsonParameters": true
+      },
+      "id": "node-http-enrich-lead",
+      "name": "Enrich Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "gpt-4o-mini",
+        "systemMessage": "Classify B2B leads, output JSON with {segment,score,owner_hint,summary}",
+        "messages": [
+          {
+            "role": "user",
+            "content": "={{$json}}"
+          }
+        ],
+        "responseType": "json"
+      },
+      "id": "node-openai-openai---chat",
+      "name": "OpenAI - Chat",
+      "type": "n8n-nodes-langchain.openai",
+      "typeVersion": 2,
+      "position": [
+        950,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "{{ $env.SLACK_CHANNEL_ID || 'C123456' }}",
+        "text": "={{$json.summary || $json.message || 'Hello from n8n'}}"
+      },
+      "id": "node-slack-notify-ae",
+      "name": "Notify AE",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "responseCode": 200,
+        "responseMode": "lastNode",
+        "responseData": "firstEntryJson"
+      },
+      "id": "node-respond-respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1950,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Docs: Lead Router Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Docs: Lead Router Setup": {
+      "main": [
+        [
+          {
+            "node": "Enrich Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Lead": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Chat": {
+      "main": [
+        [
+          {
+            "node": "Notify AE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify AE": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "regular"
+  },
+  "staticData": {},
+  "version": 2,
+  "meta": {
+    "created": "2025-10-03T14:44:37.601341Z",
+    "author": "Mehdi Belbachir – SMB Pack (Generated)"
+  }
+}

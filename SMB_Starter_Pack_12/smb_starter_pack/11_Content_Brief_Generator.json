@@ -1,0 +1,154 @@
+{
+  "name": "Content Brief Generator (Webhook → LLM → Doc → Slack)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content-brief",
+        "responseMode": "lastNode",
+        "responseData": "allEntries"
+      },
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "gpt-4o-mini",
+        "systemMessage": "Turn topic+audience into a content brief with outline, SEO keywords, and sources.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "={{$json}}"
+          }
+        ],
+        "responseType": "json"
+      },
+      "id": "node-openai-openai---chat",
+      "name": "OpenAI - Chat",
+      "type": "n8n-nodes-langchain.openai",
+      "typeVersion": 2,
+      "position": [
+        950,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://docs.example.com/create",
+        "options": {
+          "useQueryString": true
+        },
+        "sendBinaryData": false,
+        "ignoreResponseCode": true,
+        "responseFormat": "json",
+        "authentication": "none",
+        "method": "POST",
+        "jsonParameters": true
+      },
+      "id": "node-http-create-doc",
+      "name": "Create Doc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "{{ $env.SLACK_CHANNEL_ID || 'C123456' }}",
+        "text": "={{$json.summary || $json.message || 'Hello from n8n'}}"
+      },
+      "id": "node-slack-send-brief",
+      "name": "Send Brief",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "responseCode": 200,
+        "responseMode": "lastNode",
+        "responseData": "firstEntryJson"
+      },
+      "id": "node-respond-respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1950,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Chat": {
+      "main": [
+        [
+          {
+            "node": "Create Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Doc": {
+      "main": [
+        [
+          {
+            "node": "Send Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Brief": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "regular"
+  },
+  "staticData": {},
+  "version": 2,
+  "meta": {
+    "created": "2025-10-03T14:44:37.602997Z",
+    "author": "Mehdi Belbachir – SMB Pack (Generated)"
+  }
+}

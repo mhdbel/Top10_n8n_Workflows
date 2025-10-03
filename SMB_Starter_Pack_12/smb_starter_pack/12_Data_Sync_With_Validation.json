@@ -1,0 +1,159 @@
+{
+  "name": "Data Sync with Validation (Cron → A → LLM → B → Slack)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": "custom",
+        "cronExpression": "*/30 * * * *"
+      },
+      "id": "node-schedule",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://sysA.example.com/data",
+        "options": {
+          "useQueryString": true
+        },
+        "sendBinaryData": false,
+        "ignoreResponseCode": true,
+        "responseFormat": "json",
+        "authentication": "none",
+        "method": "GET",
+        "jsonParameters": true
+      },
+      "id": "node-http-fetch-from-a",
+      "name": "Fetch From A",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "gpt-4o-mini",
+        "systemMessage": "Validate and normalize incoming JSON to target schema. Output corrected JSON.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "={{$json}}"
+          }
+        ],
+        "responseType": "json"
+      },
+      "id": "node-openai-openai---chat",
+      "name": "OpenAI - Chat",
+      "type": "n8n-nodes-langchain.openai",
+      "typeVersion": 2,
+      "position": [
+        950,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://sysB.example.com/upsert",
+        "options": {
+          "useQueryString": true
+        },
+        "sendBinaryData": false,
+        "ignoreResponseCode": true,
+        "responseFormat": "json",
+        "authentication": "none",
+        "method": "POST",
+        "jsonParameters": true
+      },
+      "id": "node-http-upsert-to-b",
+      "name": "Upsert To B",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "{{ $env.SLACK_CHANNEL_ID || 'C123456' }}",
+        "text": "={{$json.summary || $json.message || 'Hello from n8n'}}"
+      },
+      "id": "node-slack-notify-sync",
+      "name": "Notify Sync",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Fetch From A",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch From A": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Chat": {
+      "main": [
+        [
+          {
+            "node": "Upsert To B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert To B": {
+      "main": [
+        [
+          {
+            "node": "Notify Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "regular"
+  },
+  "staticData": {},
+  "version": 2,
+  "meta": {
+    "created": "2025-10-03T14:44:37.603181Z",
+    "author": "Mehdi Belbachir – SMB Pack (Generated)"
+  }
+}

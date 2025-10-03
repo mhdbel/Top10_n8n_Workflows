@@ -1,0 +1,187 @@
+{
+  "name": "Meeting Assistant (Webhook → ASR → LLM → Tasks → Slack)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zoom-meeting-end",
+        "responseMode": "lastNode",
+        "responseData": "allEntries"
+      },
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://asr.example.com/transcribe",
+        "options": {
+          "useQueryString": true
+        },
+        "sendBinaryData": false,
+        "ignoreResponseCode": true,
+        "responseFormat": "json",
+        "authentication": "none",
+        "method": "POST",
+        "jsonParameters": true
+      },
+      "id": "node-http-transcribe",
+      "name": "Transcribe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "gpt-4o-mini",
+        "systemMessage": "Summarize meeting, extract action items [owner, due, task].",
+        "messages": [
+          {
+            "role": "user",
+            "content": "={{$json}}"
+          }
+        ],
+        "responseType": "json"
+      },
+      "id": "node-openai-openai---chat",
+      "name": "OpenAI - Chat",
+      "type": "n8n-nodes-langchain.openai",
+      "typeVersion": 2,
+      "position": [
+        950,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://pm.example.com/tasks",
+        "options": {
+          "useQueryString": true
+        },
+        "sendBinaryData": false,
+        "ignoreResponseCode": true,
+        "responseFormat": "json",
+        "authentication": "none",
+        "method": "POST",
+        "jsonParameters": true
+      },
+      "id": "node-http-create-tasks",
+      "name": "Create Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "{{ $env.SLACK_CHANNEL_ID || 'C123456' }}",
+        "text": "={{$json.summary || $json.message || 'Hello from n8n'}}"
+      },
+      "id": "node-slack-dm-attendees",
+      "name": "DM Attendees",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "responseCode": 200,
+        "responseMode": "lastNode",
+        "responseData": "firstEntryJson"
+      },
+      "id": "node-respond-respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1950,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Transcribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Chat": {
+      "main": [
+        [
+          {
+            "node": "Create Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tasks": {
+      "main": [
+        [
+          {
+            "node": "DM Attendees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DM Attendees": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "regular"
+  },
+  "staticData": {},
+  "version": 2,
+  "meta": {
+    "created": "2025-10-03T14:44:37.602118Z",
+    "author": "Mehdi Belbachir – SMB Pack (Generated)"
+  }
+}
